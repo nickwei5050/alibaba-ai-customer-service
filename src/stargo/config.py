@@ -43,6 +43,9 @@ class KnowledgeConfig(BaseModel):
     notion_enabled: bool = False
     notion_api_key: str = ""
     notion_database_id: str = ""
+    # Structured product-catalog database (one row per model). Pulls all models'
+    # specs (voltage/motor/range/...) into the index when synced locally.
+    notion_catalog_database_id: str = ""
 
 
 class AIConfig(BaseModel):

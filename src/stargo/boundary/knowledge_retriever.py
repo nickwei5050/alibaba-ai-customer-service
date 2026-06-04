@@ -13,7 +13,7 @@ from collections import Counter
 
 from ..config import KnowledgeConfig
 from .knowledge_obsidian import KnowledgeDoc, load_obsidian
-from .knowledge_notion import load_notion
+from .knowledge_notion import load_notion, load_notion_catalog
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +45,7 @@ class Retriever:
         docs = load_obsidian(cfg.obsidian_path)
         if cfg.notion_enabled:
             docs += load_notion(cfg.notion_api_key, cfg.notion_database_id)
+            docs += load_notion_catalog(cfg.notion_api_key, cfg.notion_catalog_database_id)
         return cls(docs)
 
     def _score(self, query_tokens: Counter[str], idx: int) -> float:

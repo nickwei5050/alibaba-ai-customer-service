@@ -23,9 +23,12 @@ browser:
 
 knowledge:
   obsidian_path: "./knowledge"            # local Markdown vault (see categories below)
-  notion_enabled: false
+  notion_enabled: false                   # set true + NOTION_API_KEY to pull live Notion content
   notion_api_key: "${NOTION_API_KEY}"
   notion_database_id: "${NOTION_DATABASE_ID}"
+  # STARGO Product Catalog database (all models' structured specs). Run `kb-sync`
+  # locally to pull all rows into the index. The id below is the catalog DB id.
+  notion_catalog_database_id: "3993f47a191f4ea3914046917a5dc28b"
   # Knowledge categories (folders under obsidian_path):
   # company / products / prices / battery / shipping / sample / distributor / faq / rules / scripts
 

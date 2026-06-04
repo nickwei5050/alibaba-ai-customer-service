@@ -11,6 +11,7 @@ Commands:
     debug-url <url>      open a View Details URL, dump DOM/screenshots + extraction
                          report, send nothing (for tuning Alibaba selectors)
     kb-search "<query>"  query the local knowledge index
+    kb-sync              pull the Notion product catalog (all models) into the local index
     run                  long-running watch loop
 """
 
@@ -121,6 +122,34 @@ def cmd_debug(app: AppContext, url: str) -> int:
     return 0
 
 
+def cmd_kb_sync(app: AppContext) -> int:
+    """Pull the Notion product-catalog (all models' specs) into a local,
+    git-ignored snapshot under the knowledge vault."""
+    from .boundary.knowledge_notion import load_notion_catalog
+
+    cfg = app.config.knowledge
+    if not cfg.notion_enabled or not cfg.notion_api_key:
+        print("Notion is not enabled or NOTION_API_KEY is missing in .env "
+              "(set knowledge.notion_enabled: true and NOTION_API_KEY).")
+        return 1
+    docs = load_notion_catalog(cfg.notion_api_key, cfg.notion_catalog_database_id)
+    if not docs:
+        print("No catalog rows pulled. Check notion_catalog_database_id and that "
+              "the Notion integration has access to the database.")
+        return 1
+    out = Path(cfg.obsidian_path) / "products" / "catalog-specs.local.md"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# STARGO 车型详细参数 (Notion 同步快照 · 本地副本 · 不入 git)",
+        f"\n> 共 {len(docs)} 款,源:Notion Product Catalog。运行 `kb-sync` 刷新。\n",
+    ]
+    for d in docs:
+        lines.append(f"## {d.title}\n{d.text}\n")
+    out.write_text("\n".join(lines), encoding="utf-8")
+    print(f"Synced {len(docs)} models -> {out}")
+    return 0
+
+
 def cmd_run(app: AppContext) -> int:
     app.watch_service().run_forever()
     return 0
@@ -139,6 +168,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_kb.add_argument("query")
     p_dbg = sub.add_parser("debug-url", help="Open an Alibaba View Details URL and dump an extraction report (sends nothing)")
     p_dbg.add_argument("url")
+    sub.add_parser("kb-sync", help="Sync the Notion product catalog (all models' specs) into the local index")
     sub.add_parser("run", help="Run the long-running watch loop")
     return parser
 
@@ -159,6 +189,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_process(app, args.url)
     if args.command == "debug-url":
         return cmd_debug(app, args.url)
+    if args.command == "kb-sync":
+        return cmd_kb_sync(app)
     if args.command == "run":
         return cmd_run(app)
     return 1

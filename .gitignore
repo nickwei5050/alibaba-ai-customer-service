@@ -4,6 +4,11 @@ config/config.yaml
 service_account.json
 *.credentials.json
 
+# Local-only knowledge (internal prices, Notion sync snapshots) — never commit
+knowledge/prices/*
+!knowledge/prices/README.md
+*.local.md
+
 # Runtime data
 data/screenshots/
 data/logs/
