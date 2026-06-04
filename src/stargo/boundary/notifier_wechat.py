@@ -24,7 +24,8 @@ def format_inquiry_message(ctx: ChatContext, reply: AIReply, *, url: str = "") -
         action = "🟡 低风险，自动发送已关闭，等待你确认。"
 
     missing = ", ".join(reply.missing_info) if reply.missing_info else "（无）"
-    received = ctx.received_at.strftime("%Y-%m-%d %H:%M") if ctx.received_at else "未知"
+    # Render in the operator's local timezone (emails carry UTC/sender offsets).
+    received = ctx.received_at.astimezone().strftime("%Y-%m-%d %H:%M") if ctx.received_at else "未知"
     approval = "✅ 需要人工确认" if reply.human_approval_required else "🟢 无需人工确认"
     body = (
         f"**客户**：{ctx.buyer_name or '未知'}\n"

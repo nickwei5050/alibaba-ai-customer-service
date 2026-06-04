@@ -21,37 +21,19 @@ browser:
   nav_timeout_ms: 45000
   slow_mo_ms: 250              # gentle pacing to look human and avoid rate limits
 
-# Alibaba Trade Center DOM selectors. Each field is a list tried in order; the
-# first match wins. Override any of these when Alibaba changes its markup — no
-# code change needed. Inspect what matched with: `debug-url "<url>"`.
-# Omit this whole block to use the built-in defaults.
-selectors:
-  buyer_name:
-    - "[class*='contact-name']"
-    - "[class*='buyer-name']"
-    - "[class*='user-name']"
-    - "[class*='nickname']"
-  country:
-    - "[class*='country']"
-    - "[class*='region']"
-    - "img[class*='flag'][alt]"
-  product_title:
-    - "[class*='product-title']"
-    - "[class*='card-title']"
-    - "a[href*='/product-detail']"
-  message:                     # chat bubbles; last one = latest buyer message
-    - "[class*='message-content']"
-    - "[class*='msg-content']"
-    - "[class*='chat-content']"
-    - "div[class*='bubble']"
-  input_box:                   # used only on the (future) auto-paste path
-    - "textarea[class*='input']"
-    - "div[contenteditable='true']"
-    - "textarea"
-  send_button:                 # never auto-clicked while force_manual_only is true
-    - "button:has-text('Send')"
-    - "button:has-text('发送')"
-    - "[class*='send-btn']"
+# Alibaba Trade Center DOM selectors.
+# The built-in defaults (see SelectorConfig in src/stargo/config.py) are the
+# single source of truth — leave this block out entirely to use them.
+# Only add a `selectors:` block to OVERRIDE a field after `debug-url "<url>"`
+# shows the default didn't match on the real page. When you override a field,
+# list every selector you want tried (your list replaces the default for that
+# field). Fields: buyer_name / country / product_title / message / input_box /
+# send_button. Example (uncomment and edit just the field you need):
+#
+# selectors:
+#   buyer_name:
+#     - "[data-spm='buyerName']"        # selector you confirmed via debug-url
+#     - "[class*='contact-name']"       # keep the defaults you still want
 
 knowledge:
   obsidian_path: "./knowledge"            # local Markdown vault (see categories below)

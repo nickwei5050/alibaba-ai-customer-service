@@ -47,13 +47,18 @@ def load_obsidian(vault_path: str) -> list[KnowledgeDoc]:
             continue
         rel = md.relative_to(root)
         category = rel.parts[0] if len(rel.parts) > 1 else "general"
-        rel_low = str(rel).lower()
+        parts = [p.lower() for p in rel.parts]
+        stem = md.stem.lower()
         head = text[:400].lower()
+        head_raw = text[:400]
         internal_only = (
-            "internal" in rel_low
+            any(p.startswith("internal") or p.startswith("cost") for p in parts)
+            or stem.startswith("internal")
+            or stem.startswith("cost")
             or "do_not_index" in head
             or "internal_only" in head
-            or "严禁对客" in text[:400]
+            or "严禁对客" in head_raw
+            or "禁止对客" in head_raw
         )
         docs.append(
             KnowledgeDoc(

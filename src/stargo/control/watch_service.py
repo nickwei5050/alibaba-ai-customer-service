@@ -53,12 +53,15 @@ class WatchService:
             path = None  # type: ignore[assignment]
         logger.warning("No View Details URL in email '%s'; saved %s", inq.subject, path)
         if self.notifier is not None:
-            self.notifier.notify_alert(
-                "【STARGO 需人工处理】邮件未能提取阿里链接",
-                f"主题：{inq.subject or '(无)'}\n"
-                f"客户：{inq.buyer_name or '未知'} ｜ 国家：{inq.country or '未知'}\n"
-                f"无法从邮件中提取 View Details 链接，已保存原始 HTML：\n{path or '(写入失败)'}",
-            )
+            try:
+                self.notifier.notify_alert(
+                    "【STARGO 需人工处理】邮件未能提取阿里链接",
+                    f"主题：{inq.subject or '(无)'}\n"
+                    f"客户：{inq.buyer_name or '未知'} ｜ 国家：{inq.country or '未知'}\n"
+                    f"无法从邮件中提取 View Details 链接，已保存原始 HTML：\n{path or '(写入失败)'}",
+                )
+            except Exception as exc:  # pragma: no cover - never let an alert abort the cycle
+                logger.error("Unparsed-email alert failed: %s", exc)
 
     def run_once(self, *, dry_run: bool = False) -> int:
         """One poll cycle. Returns the number of inquiries processed.
@@ -72,9 +75,18 @@ class WatchService:
             return 0
         logger.info("Fetched %d new inquiry email(s).", len(inquiries))
 
+        # Only emails we actually finished (dumped+alerted, or processed) are
+        # marked seen. Ones that raised, or that overflow max_per_cycle, are left
+        # unmarked so the next cycle retries them instead of dropping them.
+        handled: list[EmailInquiry] = []
+
         for inq in inquiries:
             if not inq.view_details_url:
-                self._handle_unparsed(inq)
+                try:
+                    self._handle_unparsed(inq)
+                    handled.append(inq)
+                except Exception as exc:  # pragma: no cover - defensive
+                    logger.exception("Handling unparsed email failed: %s", exc)
 
         batch = [i for i in inquiries if i.view_details_url][: self.runtime.max_per_cycle]
         processed = 0
@@ -86,10 +98,11 @@ class WatchService:
                             browser, inq.view_details_url, dry_run=dry_run, email_hint=inq
                         )
                         processed += 1
+                        handled.append(inq)
                     except Exception as exc:  # pragma: no cover - keep going
                         logger.exception("Failed processing %s: %s", inq.view_details_url, exc)
                     time.sleep(self.runtime.min_action_interval_seconds)
-        self.mail_source.mark_processed(inquiries)
+        self.mail_source.mark_processed(handled)
         return processed
 
     def run_forever(self) -> None:

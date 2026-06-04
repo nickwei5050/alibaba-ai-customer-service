@@ -43,6 +43,16 @@ class InquiryPipeline:
         self.crm = crm
         self.max_context_chars = max_context_chars
 
+    @staticmethod
+    def _may_send(reply: AIReply, dry_run: bool) -> bool:
+        """The single choke point for sending anything to a buyer.
+
+        Sending requires ALL of: not a dry-run, the AI opted to auto-send, and no
+        human approval is required. RiskChecker (with force_manual_only) drives
+        the latter two to a safe state; this method is the one place to audit.
+        """
+        return (not dry_run) and reply.auto_send and (not reply.human_approval_required)
+
     def _draft(self, ctx: ChatContext) -> AIReply:
         query = " ".join(filter(None, [ctx.product_title, ctx.latest_message]))
         knowledge = self.knowledge.context_snippets(query, self.max_context_chars)
@@ -99,7 +109,17 @@ class InquiryPipeline:
             if ctx.needs_captcha:
                 detail.append("出现验证码/安全验证，需要人工处理。")
             if ctx.extraction_failed:
-                detail.append("无法读取对话内容（页面结构可能变化）。")
+                detail.append("无法读取对话内容（页面结构可能变化，需校准选择器）。")
+            # Surface whatever the source email told us, so a selector miss still
+            # gives the operator the buyer / product / message to act on.
+            hint = [
+                f"客户：{ctx.buyer_name}" if ctx.buyer_name else "",
+                f"国家：{ctx.country}" if ctx.country else "",
+                f"产品：{ctx.product_title}" if ctx.product_title else "",
+                f"邮件预览：{ctx.message_preview}" if ctx.message_preview else "",
+                f"截图：{ctx.screenshot_path}" if ctx.screenshot_path else "",
+            ]
+            detail += [h for h in hint if h]
             self.notifier.notify_alert(
                 "【STARGO 需人工处理】无法读取阿里对话",
                 "\n".join(detail) or "未知问题",
@@ -116,7 +136,7 @@ class InquiryPipeline:
         reply = self._draft(ctx)
 
         status = "dry_run" if dry_run else "awaiting_approval"
-        if not dry_run and reply.auto_send and not reply.human_approval_required:
+        if self._may_send(reply, dry_run):
             _, sent = browser.open_and_reply(url, reply.reply_en)
             status = "auto_sent" if sent else "failed"
             if not sent:

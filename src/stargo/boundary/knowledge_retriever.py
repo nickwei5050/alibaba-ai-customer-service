@@ -58,18 +58,21 @@ class Retriever:
                 score += qcount * doc[term] * self._idf.get(term, 1.0)
         return score / math.sqrt(sum(doc.values()))
 
-    def search(self, query: str, top_k: int = 5) -> list[KnowledgeDoc]:
+    def search(
+        self, query: str, top_k: int = 5, *, exclude_internal: bool = False
+    ) -> list[KnowledgeDoc]:
         if not self.docs:
             return []
         qt = Counter(_tokens(query))
         if not qt:
             return []
-        ranked = sorted(
-            range(len(self.docs)),
-            key=lambda i: self._score(qt, i),
-            reverse=True,
-        )
-        results = [self.docs[i] for i in ranked if self._score(qt, i) > 0]
+        # Score every doc once, keep positives, sort, then filter + truncate so
+        # internal-only docs never consume a public slot.
+        scored = [(i, self._score(qt, i)) for i in range(len(self.docs))]
+        scored = sorted((p for p in scored if p[1] > 0), key=lambda p: p[1], reverse=True)
+        results = [self.docs[i] for i, _ in scored]
+        if exclude_internal:
+            results = [d for d in results if not d.internal_only]
         return results[:top_k]
 
     def context_snippets(self, query: str, max_chars: int, top_k: int = 5) -> str:

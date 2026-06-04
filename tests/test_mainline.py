@@ -164,6 +164,48 @@ def test_watch_alerts_and_dumps_when_no_link(tmp_path):
     assert dumps and "no link here" in dumps[0].read_text()
 
 
+# --- watch_service: never drop un-handled inquiries ------------------------
+class _CtxMgr:
+    def __init__(self, obj): self.obj = obj
+    def __enter__(self): return self.obj
+    def __exit__(self, *a): return False
+
+
+class RecordingMail:
+    def __init__(self, inquiries): self._inq = inquiries; self.marked = None
+    def fetch_new(self): return self._inq
+    def mark_processed(self, inquiries): self.marked = list(inquiries)
+
+
+def test_failed_inquiry_is_not_marked_processed():
+    class BoomPipeline:
+        notifier = None
+        def process(self, *a, **k):
+            raise RuntimeError("transient browser failure")
+
+    inq = EmailInquiry(message_id="m1", view_details_url="https://x/1")
+    mail = RecordingMail([inq])
+    ws = WatchService(mail_source=mail, pipeline=BoomPipeline(),
+                      browser_factory=lambda: _CtxMgr(object()), runtime=RuntimeConfig())
+    ws.run_once()
+    assert mail.marked == []                      # retried next cycle, not dropped
+
+
+def test_overflow_inquiries_are_not_marked():
+    class OkPipeline:
+        notifier = None
+        def process(self, *a, **k): return None
+
+    inqs = [EmailInquiry(message_id=f"m{i}", view_details_url=f"https://x/{i}") for i in range(3)]
+    mail = RecordingMail(inqs)
+    ws = WatchService(mail_source=mail, pipeline=OkPipeline(),
+                      browser_factory=lambda: _CtxMgr(object()),
+                      runtime=RuntimeConfig(max_per_cycle=1))
+    processed = ws.run_once()
+    assert processed == 1
+    assert len(mail.marked) == 1                  # only the one we handled
+
+
 # --- notification content --------------------------------------------------
 def test_notification_includes_required_fields():
     ctx = ChatContext(buyer_name="Ravi", country="India", product_title="STARGO TANK",
@@ -173,7 +215,10 @@ def test_notification_includes_required_fields():
                     reply_en="Hi Ravi, our MOQ is ...", reply_cn="询问MOQ，安全回复",
                     human_approval_required=True, reason="info collection")
     title, body = format_inquiry_message(ctx, reply, url="https://x/inq")
+    # Received time is rendered in the operator's local tz — compute the expected
+    # string the same way so the test is timezone-independent.
+    local_time = ctx.received_at.astimezone().strftime("%Y-%m-%d %H:%M")
     for needle in ["Ravi", "India", "STARGO TANK", "What is your MOQ?", "spec_inquiry",
                    "B", "model, quantity", "Hi Ravi", "询问MOQ", "需要人工确认",
-                   "/data/s/loaded.png", "2026-06-04 09:30"]:
+                   "/data/s/loaded.png", local_time]:
         assert needle in (title + body), needle
