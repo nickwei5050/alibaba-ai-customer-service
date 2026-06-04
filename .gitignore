@@ -1,0 +1,29 @@
+# Secrets & local config
+.env
+config/config.yaml
+service_account.json
+*.credentials.json
+
+# Runtime data
+data/screenshots/
+data/logs/
+data/*.db
+data/*.sqlite
+chrome-profile/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env.*
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+build/
+dist/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

@@ -1,0 +1,144 @@
+"""CLI / orchestrator for the STARGO Alibaba Inquiry AI Assistant.
+
+Commands:
+    notify-test          send a test WeChat/WeCom message
+    mail-check           poll the mailbox once and print parsed inquiries
+    process <url>        run the full pipeline for one View Details URL
+    kb-search "<query>"  query the local knowledge index
+    run                  long-running watch loop
+"""
+
+from __future__ import annotations
+
+import argparse
+import logging
+import time
+
+from .browser.alibaba_playwright import alibaba_browser
+from .config import load_config
+from .inbox.mail_watcher import MailWatcher
+from .inbox.store import ProcessedStore
+from .knowledge.retriever import Retriever
+from .logging_setup import setup_logging
+from .notify.notifier import Notifier
+from .pipeline import Pipeline
+
+logger = logging.getLogger(__name__)
+
+
+def cmd_notify_test(config) -> int:
+    notifier = Notifier(config.wechat)
+    if not notifier.configured:
+        print(f"WeChat provider '{config.wechat.provider}' is not configured. "
+              "Set the matching secret in .env.")
+        return 1
+    ok = notifier.notify_alert(
+        "STARGO 测试通知",
+        "如果你收到这条消息，说明微信通知已经配置成功 ✅",
+    )
+    print("Notification sent." if ok else "Notification failed (see logs).")
+    return 0 if ok else 1
+
+
+def cmd_mail_check(config) -> int:
+    store = ProcessedStore(config.runtime.db_path)
+    watcher = MailWatcher(config.email, store)
+    inquiries = watcher.fetch_new()
+    if not inquiries:
+        print("No new matching inquiry emails.")
+        return 0
+    print(f"Found {len(inquiries)} new inquiry email(s):\n")
+    for inq in inquiries:
+        print(f"- {inq.buyer_name or '(unknown)'} | {inq.country or '?'} | "
+              f"{inq.product_title or '?'}")
+        print(f"  preview: {inq.message_preview[:120]}")
+        print(f"  url: {inq.view_details_url or '(no link found)'}\n")
+    store.close()
+    return 0
+
+
+def cmd_kb_search(config, query: str) -> int:
+    retriever = Retriever.from_config(config.knowledge)
+    results = retriever.search(query, top_k=5)
+    if not results:
+        print("No matching knowledge docs (is knowledge.obsidian_path set?).")
+        return 0
+    for doc in results:
+        print(f"[{doc.category}] {doc.title}  ({doc.source})")
+        print(f"  {doc.text[:160].strip()}...\n")
+    return 0
+
+
+def cmd_process(config, url: str) -> int:
+    pipeline = Pipeline.build(config)
+    with alibaba_browser(config.browser, config.runtime) as browser:
+        ctx = pipeline.process(browser, url)
+    print(f"Done. status -> {'blocked' if not ctx.ok else 'processed'}; "
+          f"screenshot: {ctx.screenshot_path or '(none)'}")
+    return 0
+
+
+def cmd_run(config) -> int:
+    store = ProcessedStore(config.runtime.db_path)
+    watcher = MailWatcher(config.email, store)
+    pipeline = Pipeline.build(config)
+    interval = config.runtime.check_interval_seconds
+    logger.info("Starting watch loop (interval=%ss, auto_send=%s).",
+                interval, config.reply_rules.auto_send_low_risk)
+
+    while True:
+        try:
+            inquiries = watcher.fetch_new()
+            if inquiries:
+                logger.info("Fetched %d new inquiry email(s).", len(inquiries))
+                batch = [i for i in inquiries if i.view_details_url][: config.runtime.max_per_cycle]
+                if batch:
+                    with alibaba_browser(config.browser, config.runtime) as browser:
+                        for inq in batch:
+                            try:
+                                pipeline.process(browser, inq.view_details_url)
+                            except Exception as exc:  # pragma: no cover
+                                logger.exception("Failed processing %s: %s",
+                                                 inq.view_details_url, exc)
+                            time.sleep(config.runtime.min_action_interval_seconds)
+                watcher.mark_processed(inquiries)
+        except Exception as exc:  # pragma: no cover - keep the loop alive
+            logger.exception("Watch cycle error: %s", exc)
+        time.sleep(interval)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="stargo", description=__doc__)
+    parser.add_argument("--config", help="Path to config.yaml", default=None)
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    sub.add_parser("notify-test", help="Send a test WeChat notification")
+    sub.add_parser("mail-check", help="Poll the mailbox once")
+    p_proc = sub.add_parser("process", help="Process a single View Details URL")
+    p_proc.add_argument("url")
+    p_kb = sub.add_parser("kb-search", help="Search the knowledge base")
+    p_kb.add_argument("query")
+    sub.add_parser("run", help="Run the long-running watch loop")
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    config = load_config(args.config)
+    setup_logging(config.runtime.log_dir)
+
+    if args.command == "notify-test":
+        return cmd_notify_test(config)
+    if args.command == "mail-check":
+        return cmd_mail_check(config)
+    if args.command == "kb-search":
+        return cmd_kb_search(config, args.query)
+    if args.command == "process":
+        return cmd_process(config, args.url)
+    if args.command == "run":
+        return cmd_run(config)
+    return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
