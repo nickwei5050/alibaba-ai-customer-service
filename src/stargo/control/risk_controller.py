@@ -38,12 +38,23 @@ class RiskDecision:
 
 
 class RiskChecker:
-    def __init__(self, rules: ReplyRules) -> None:
+    def __init__(self, rules: ReplyRules, force_manual_only: bool = False) -> None:
         self.rules = rules
+        # Master kill-switch: when true, nothing is ever auto-sent — every reply
+        # is routed to human approval regardless of risk topic or AI output.
+        self.force_manual_only = force_manual_only
 
     def evaluate(self, ctx: ChatContext, reply: AIReply) -> RiskDecision:
         combined = f"{ctx.latest_message}\n{reply.reply_en}"
         topics = sorted(set(detect_risk_topics(combined)))
+
+        if self.force_manual_only:
+            return RiskDecision(
+                auto_send=False,
+                approval_required=True,
+                reason="Manual-only mode (force_manual_only): every reply needs human approval.",
+                topics=topics,
+            )
 
         gating: list[str] = []
         for topic in topics:

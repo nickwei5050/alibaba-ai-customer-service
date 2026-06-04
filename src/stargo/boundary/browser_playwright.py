@@ -20,18 +20,24 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterator
 
-from ..config import BrowserConfig, RuntimeConfig
+from ..config import BrowserConfig, RuntimeConfig, SelectorConfig
 from ..entity.models import ChatContext
-from .chat_extract import extract_chat
+from .chat_extract import extract_chat, probe_selectors
 from .chat_send import send_reply as _send_reply
 
 logger = logging.getLogger(__name__)
 
 
 class AlibabaBrowser:
-    def __init__(self, browser_cfg: BrowserConfig, runtime_cfg: RuntimeConfig) -> None:
+    def __init__(
+        self,
+        browser_cfg: BrowserConfig,
+        runtime_cfg: RuntimeConfig,
+        selectors: SelectorConfig | None = None,
+    ) -> None:
         self.cfg = browser_cfg
         self.runtime = runtime_cfg
+        self.selectors = selectors or SelectorConfig()
         self._pw = None
         self._context = None
         Path(runtime_cfg.screenshot_dir).mkdir(parents=True, exist_ok=True)
@@ -83,7 +89,7 @@ class AlibabaBrowser:
             self._screenshot(page, "before")
             page.goto(url, wait_until="domcontentloaded")
             time.sleep(max(self.runtime.min_action_interval_seconds, 2))
-            ctx = extract_chat(page)
+            ctx = extract_chat(page, self.selectors)
             ctx.screenshot_path = self._screenshot(page, "loaded")
             return ctx
         except Exception as exc:
@@ -131,7 +137,7 @@ class AlibabaBrowser:
             except Exception:  # pragma: no cover
                 report["html_path"] = ""
 
-            ctx = extract_chat(page)
+            ctx = extract_chat(page, self.selectors)
             report["needs_login"] = ctx.needs_login
             report["needs_captcha"] = ctx.needs_captcha
             report["extraction_failed"] = ctx.extraction_failed
@@ -142,6 +148,8 @@ class AlibabaBrowser:
             report["latest_message"] = ctx.latest_message
             report["chat_history_count"] = len(ctx.chat_history)
             report["chat_preview"] = ctx.chat_history[:5]
+            # Per-field selector diagnostics + input/send presence (no sending).
+            report["selector_report"] = probe_selectors(page, self.selectors)
             return report
         except Exception as exc:
             logger.error("inspect failed for %s: %s", url, exc)
@@ -164,11 +172,11 @@ class AlibabaBrowser:
         try:
             page.goto(url, wait_until="domcontentloaded")
             time.sleep(max(self.runtime.min_action_interval_seconds, 2))
-            ctx = extract_chat(page)
+            ctx = extract_chat(page, self.selectors)
             if not ctx.ok:
                 ctx.screenshot_path = self._screenshot(page, "blocked")
                 return ctx, False
-            sent = _send_reply(page, reply_text)
+            sent = _send_reply(page, reply_text, self.selectors)
             time.sleep(max(self.runtime.min_action_interval_seconds, 1))
             ctx.screenshot_path = self._screenshot(page, "after-send" if sent else "send-failed")
             return ctx, sent
@@ -184,8 +192,12 @@ class AlibabaBrowser:
 
 
 @contextmanager
-def alibaba_browser(browser_cfg: BrowserConfig, runtime_cfg: RuntimeConfig) -> Iterator[AlibabaBrowser]:
-    browser = AlibabaBrowser(browser_cfg, runtime_cfg)
+def alibaba_browser(
+    browser_cfg: BrowserConfig,
+    runtime_cfg: RuntimeConfig,
+    selectors: SelectorConfig | None = None,
+) -> Iterator[AlibabaBrowser]:
+    browser = AlibabaBrowser(browser_cfg, runtime_cfg, selectors)
     browser.start()
     try:
         yield browser

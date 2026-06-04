@@ -114,6 +114,7 @@ def parse_inquiry(
         message_preview=_strip_known_labels(text),
         view_details_url=url,
         received_at=received_at,
+        raw_html=html_body or "",
     )
 
 

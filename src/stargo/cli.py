@@ -12,6 +12,7 @@ Commands:
                          report, send nothing (for tuning Alibaba selectors)
     kb-search "<query>"  query the local knowledge index
     kb-sync              pull the Notion product catalog (all models) into the local index
+    run-once [--dry-run] run one full poll cycle (email→page→KB→reply→WeChat→CRM)
     run                  long-running watch loop
 """
 
@@ -105,6 +106,19 @@ def cmd_debug(app: AppContext, url: str) -> int:
         f"html dump:      {report.get('html_path', '')}",
         f"screenshots:    {', '.join(s for s in report.get('screenshots', []) if s)}",
     ]
+    sel = report.get("selector_report") or {}
+    if sel:
+        lines.append("selector matches (tune these in config.selectors):")
+        for field in ("buyer_name", "country", "product_title", "chat_history",
+                      "input_box", "send_button"):
+            info = sel.get(field, {})
+            extra = ""
+            if "count" in info:
+                extra = f" (count={info['count']}"
+                if "visible" in info:
+                    extra += f", visible={info['visible']}"
+                extra += ")"
+            lines.append(f"  {field:14s} -> {info.get('matched_selector', '(none)')}{extra}")
     preview = report.get("chat_preview") or []
     if preview:
         lines.append("chat preview:")
@@ -150,6 +164,27 @@ def cmd_kb_sync(app: AppContext) -> int:
     return 0
 
 
+def cmd_run_once(app: AppContext, dry_run: bool) -> int:
+    """Run one full poll cycle end-to-end. With ``--dry-run`` nothing is ever
+    sent to a buyer (page is read, reply drafted, WeChat + CRM written only)."""
+    safety = app.config.safety
+    mode = "DRY-RUN (no Alibaba message will be sent)" if dry_run else "LIVE"
+    print(f"===== STARGO run-once [{mode}] =====")
+    print(f"force_manual_only={safety.force_manual_only}  "
+          f"auto_send_low_risk={app.config.reply_rules.auto_send_low_risk}")
+    if not (app.config.email.user and app.config.email.password):
+        print("Email is not configured (.env EMAIL_USER / EMAIL_PASSWORD); "
+              "nothing to poll. Configure email, or use `debug-url <url>` to test "
+              "the page-extraction step directly.")
+        return 1
+    processed = app.watch_service().run_once(dry_run=dry_run)
+    print(f"Processed {processed} inquiry(ies).")
+    print(f"CRM (SQLite): {app.config.crm.sqlite_path}")
+    print(f"Screenshots:  {app.config.runtime.screenshot_dir}")
+    print(f"Logs:         {app.config.runtime.log_dir}")
+    return 0
+
+
 def cmd_run(app: AppContext) -> int:
     app.watch_service().run_forever()
     return 0
@@ -169,6 +204,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_dbg = sub.add_parser("debug-url", help="Open an Alibaba View Details URL and dump an extraction report (sends nothing)")
     p_dbg.add_argument("url")
     sub.add_parser("kb-sync", help="Sync the Notion product catalog (all models' specs) into the local index")
+    p_once = sub.add_parser("run-once", help="Run one full poll cycle (email→page→KB→reply→WeChat→CRM)")
+    p_once.add_argument("--dry-run", action="store_true",
+                        help="Never send any Alibaba message (read + draft + notify + log only)")
     sub.add_parser("run", help="Run the long-running watch loop")
     return parser
 
@@ -191,6 +229,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_debug(app, args.url)
     if args.command == "kb-sync":
         return cmd_kb_sync(app)
+    if args.command == "run-once":
+        return cmd_run_once(app, args.dry_run)
     if args.command == "run":
         return cmd_run(app)
     return 1

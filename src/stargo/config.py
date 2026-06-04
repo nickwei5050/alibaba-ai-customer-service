@@ -38,6 +38,66 @@ class BrowserConfig(BaseModel):
     slow_mo_ms: int = 250
 
 
+class SelectorConfig(BaseModel):
+    """Tunable Alibaba Trade Center DOM selectors.
+
+    Each field is an ordered list of CSS selectors tried broadest-useful first;
+    the first one that yields text/visibility wins. Override any of these in
+    config.yaml when Alibaba changes its markup — no code change needed.
+    Inspect matches with ``debug-url``.
+    """
+
+    message: list[str] = Field(default_factory=lambda: [
+        "[class*='message-content']",
+        "[class*='msg-content']",
+        "[class*='chat-content']",
+        "[class*='im-message']",
+        "div[class*='bubble']",
+    ])
+    product_title: list[str] = Field(default_factory=lambda: [
+        "[class*='product-title']",
+        "[class*='card-title']",
+        "a[href*='/product-detail']",
+    ])
+    buyer_name: list[str] = Field(default_factory=lambda: [
+        "[class*='contact-name']",
+        "[class*='buyer-name']",
+        "[class*='user-name']",
+        "[class*='customer-name']",
+        "[class*='nickname']",
+    ])
+    country: list[str] = Field(default_factory=lambda: [
+        "[class*='country']",
+        "[class*='nation']",
+        "[class*='region']",
+        "img[class*='flag'][alt]",
+    ])
+    input_box: list[str] = Field(default_factory=lambda: [
+        "textarea[class*='input']",
+        "div[contenteditable='true']",
+        "textarea",
+        "[class*='editor'] [contenteditable='true']",
+    ])
+    send_button: list[str] = Field(default_factory=lambda: [
+        "button:has-text('Send')",
+        "button:has-text('发送')",
+        "[class*='send-btn']",
+        "[class*='btn-send']",
+    ])
+
+
+class SafetyConfig(BaseModel):
+    """Hard safety switches enforced regardless of AI output.
+
+    ``force_manual_only`` is the master kill-switch for the current rollout
+    phase: when true, NOTHING is ever auto-sent to a buyer — every reply is
+    routed to human approval, even if the AI or low-risk rules would allow
+    sending. Keep this true until the human-in-the-loop loop is trusted.
+    """
+
+    force_manual_only: bool = True
+
+
 class KnowledgeConfig(BaseModel):
     obsidian_path: str = "./knowledge"
     notion_enabled: bool = False
@@ -92,9 +152,11 @@ class RuntimeConfig(BaseModel):
 class Config(BaseModel):
     email: EmailConfig = Field(default_factory=EmailConfig)
     browser: BrowserConfig = Field(default_factory=BrowserConfig)
+    selectors: SelectorConfig = Field(default_factory=SelectorConfig)
     knowledge: KnowledgeConfig = Field(default_factory=KnowledgeConfig)
     ai: AIConfig = Field(default_factory=AIConfig)
     reply_rules: ReplyRules = Field(default_factory=ReplyRules)
+    safety: SafetyConfig = Field(default_factory=SafetyConfig)
     wechat: WeChatConfig = Field(default_factory=WeChatConfig)
     crm: CRMConfig = Field(default_factory=CRMConfig)
     runtime: RuntimeConfig = Field(default_factory=RuntimeConfig)

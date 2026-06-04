@@ -24,17 +24,23 @@ def format_inquiry_message(ctx: ChatContext, reply: AIReply, *, url: str = "") -
         action = "🟡 低风险，自动发送已关闭，等待你确认。"
 
     missing = ", ".join(reply.missing_info) if reply.missing_info else "（无）"
+    received = ctx.received_at.strftime("%Y-%m-%d %H:%M") if ctx.received_at else "未知"
+    approval = "✅ 需要人工确认" if reply.human_approval_required else "🟢 无需人工确认"
     body = (
         f"**客户**：{ctx.buyer_name or '未知'}\n"
         f"**国家**：{ctx.country or '未知'}\n"
         f"**平台**：Alibaba\n"
-        f"**产品**：{ctx.product_title or '未识别'}\n\n"
-        f"**客户消息**：\n> {ctx.latest_message or '(空)'}\n\n"
+        f"**产品**：{ctx.product_title or '未识别'}\n"
+        f"**收到时间**：{received}\n\n"
+        f"**客户原话**：\n> {ctx.latest_message or '(空)'}\n\n"
         f"**AI判断**：意图 {reply.intent} ｜ 客户等级 {reply.customer_level}\n"
         f"**缺少信息**：{missing}\n"
         f"**风险原因**：{reply.reason}\n\n"
-        f"**AI建议回复**：\n{reply.reply_en}\n\n"
-        f"**处理建议**：{action}"
+        f"**英文回复建议**：\n{reply.reply_en or '(无)'}\n\n"
+        f"**中文解释**：{reply.reply_cn or '(无)'}\n\n"
+        f"**是否需要人工确认**：{approval}\n"
+        f"**处理建议**：{action}\n"
+        f"**调试截图**：{ctx.screenshot_path or '(无)'}"
     )
     if url:
         body += f"\n\n[打开阿里对话]({url})"

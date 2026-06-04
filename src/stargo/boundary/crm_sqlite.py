@@ -19,7 +19,9 @@ CREATE TABLE IF NOT EXISTS inquiries (
     buyer_message TEXT,
     ai_intent TEXT,
     customer_level TEXT,
+    missing_info TEXT,
     ai_reply_en TEXT,
+    ai_reply_cn TEXT,
     auto_send INTEGER,
     approval_required INTEGER,
     status TEXT,
@@ -28,23 +30,36 @@ CREATE TABLE IF NOT EXISTS inquiries (
 )
 """
 
+# Columns added after the first release; ensured on existing DBs at startup.
+_MIGRATIONS = (
+    ("missing_info", "TEXT"),
+    ("ai_reply_cn", "TEXT"),
+)
+
 
 class SqliteLogger:
     def __init__(self, db_path: str) -> None:
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(db_path)
         self._conn.execute(_SCHEMA)
+        self._migrate()
         self._conn.commit()
+
+    def _migrate(self) -> None:
+        existing = {row[1] for row in self._conn.execute("PRAGMA table_info(inquiries)")}
+        for col, decl in _MIGRATIONS:
+            if col not in existing:
+                self._conn.execute(f"ALTER TABLE inquiries ADD COLUMN {col} {decl}")
 
     def log(self, record: InquiryRecord) -> int:
         cur = self._conn.execute(
             """
             INSERT INTO inquiries (
                 date, platform, buyer_name, country, product_title, product_url,
-                buyer_message, ai_intent, customer_level, ai_reply_en,
-                auto_send, approval_required, status, screenshot_path,
+                buyer_message, ai_intent, customer_level, missing_info, ai_reply_en,
+                ai_reply_cn, auto_send, approval_required, status, screenshot_path,
                 next_follow_up_time
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 record.date.isoformat(),
@@ -56,7 +71,9 @@ class SqliteLogger:
                 record.buyer_message,
                 record.ai_intent,
                 record.customer_level,
+                record.missing_info,
                 record.ai_reply_en,
+                record.ai_reply_cn,
                 int(record.auto_send),
                 int(record.approval_required),
                 record.status,

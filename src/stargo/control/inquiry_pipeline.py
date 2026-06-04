@@ -19,7 +19,7 @@ from ..boundary.interfaces import (
     Notifier,
     ReplyDrafter,
 )
-from ..entity.models import AIReply, ChatContext, InquiryRecord
+from ..entity.models import AIReply, ChatContext, EmailInquiry, InquiryRecord
 from .risk_controller import RiskChecker
 
 logger = logging.getLogger(__name__)
@@ -59,7 +59,9 @@ class InquiryPipeline:
             buyer_message=ctx.latest_message,
             ai_intent=reply.intent,
             customer_level=reply.customer_level,
+            missing_info=", ".join(reply.missing_info),
             ai_reply_en=reply.reply_en,
+            ai_reply_cn=reply.reply_cn,
             auto_send=reply.auto_send,
             approval_required=reply.human_approval_required,
             status=status,
@@ -70,10 +72,25 @@ class InquiryPipeline:
         except Exception as exc:  # pragma: no cover - defensive
             logger.error("CRM logging failed: %s", exc)
 
-    def process(self, browser: BrowserDriver, url: str) -> ChatContext:
-        """Process one inquiry using an already-started browser driver."""
-        logger.info("Processing inquiry: %s", url)
+    def process(
+        self,
+        browser: BrowserDriver,
+        url: str,
+        *,
+        dry_run: bool = False,
+        email_hint: EmailInquiry | None = None,
+    ) -> ChatContext:
+        """Process one inquiry using an already-started browser driver.
+
+        ``dry_run`` guarantees no message is ever sent to the buyer (the page is
+        read and a draft + notification produced, but ``open_and_reply`` is never
+        called). ``email_hint`` backfills any field the DOM extraction missed
+        from the source notification email.
+        """
+        logger.info("Processing inquiry%s: %s", " [dry-run]" if dry_run else "", url)
         ctx = browser.open_inquiry(url)
+        if email_hint is not None:
+            ctx.merge_email_hint(email_hint)
 
         if not ctx.ok:
             detail = []
@@ -88,13 +105,18 @@ class InquiryPipeline:
                 "\n".join(detail) or "未知问题",
                 url=url,
             )
-            self._log(ctx, AIReply(reason="blocked"), status="needs_login")
+            blocked_status = (
+                "needs_login" if ctx.needs_login
+                else "needs_captcha" if ctx.needs_captcha
+                else "failed"
+            )
+            self._log(ctx, AIReply(reason="blocked"), status=blocked_status)
             return ctx
 
         reply = self._draft(ctx)
 
-        status = "awaiting_approval"
-        if reply.auto_send and not reply.human_approval_required:
+        status = "dry_run" if dry_run else "awaiting_approval"
+        if not dry_run and reply.auto_send and not reply.human_approval_required:
             _, sent = browser.open_and_reply(url, reply.reply_en)
             status = "auto_sent" if sent else "failed"
             if not sent:

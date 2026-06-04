@@ -73,10 +73,16 @@ class Retriever:
         return results[:top_k]
 
     def context_snippets(self, query: str, max_chars: int, top_k: int = 5) -> str:
-        """Concatenate top docs into a budgeted context block for the prompt."""
+        """Concatenate top docs into a budgeted context block for the prompt.
+
+        Internal-only docs (e.g. internal cost prices) are skipped here so they
+        can never leak into a buyer-facing reply. Fetch extra candidates to
+        backfill the slots dropped by the filter.
+        """
         chunks: list[str] = []
         used = 0
-        for doc in self.search(query, top_k=top_k):
+        candidates = [d for d in self.search(query, top_k=top_k * 3) if not d.internal_only]
+        for doc in candidates[:top_k]:
             header = f"### [{doc.category}] {doc.title}\n"
             body = doc.text.strip()
             piece = header + body

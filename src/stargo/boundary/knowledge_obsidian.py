@@ -18,6 +18,9 @@ class KnowledgeDoc:
     text: str
     source: str
     tags: list[str] = field(default_factory=list)
+    # Operator-only docs (e.g. internal cost prices). Searchable by the operator
+    # via ``kb-search``, but NEVER injected into the buyer-facing AI prompt.
+    internal_only: bool = False
 
 
 def load_obsidian(vault_path: str) -> list[KnowledgeDoc]:
@@ -44,12 +47,21 @@ def load_obsidian(vault_path: str) -> list[KnowledgeDoc]:
             continue
         rel = md.relative_to(root)
         category = rel.parts[0] if len(rel.parts) > 1 else "general"
+        rel_low = str(rel).lower()
+        head = text[:400].lower()
+        internal_only = (
+            "internal" in rel_low
+            or "do_not_index" in head
+            or "internal_only" in head
+            or "严禁对客" in text[:400]
+        )
         docs.append(
             KnowledgeDoc(
                 title=md.stem,
                 category=category,
                 text=text,
                 source=str(rel),
+                internal_only=internal_only,
             )
         )
     logger.info("Loaded %d Obsidian docs from %s", len(docs), root)

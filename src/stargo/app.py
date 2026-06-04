@@ -36,7 +36,10 @@ class AppContext:
         self.drafter = ReplyGenerator(config.ai)
 
         # Control (depends only on the above via Protocols).
-        self.risk = RiskChecker(config.reply_rules)
+        self.risk = RiskChecker(
+            config.reply_rules,
+            force_manual_only=config.safety.force_manual_only,
+        )
         self.pipeline = InquiryPipeline(
             knowledge=self.knowledge,
             drafter=self.drafter,
@@ -48,7 +51,9 @@ class AppContext:
 
     def browser(self):
         """Context manager yielding a started :class:`BrowserDriver`."""
-        return alibaba_browser(self.config.browser, self.config.runtime)
+        return alibaba_browser(
+            self.config.browser, self.config.runtime, self.config.selectors
+        )
 
     def watch_service(self) -> WatchService:
         return WatchService(
@@ -56,5 +61,6 @@ class AppContext:
             pipeline=self.pipeline,
             browser_factory=self.browser,
             runtime=self.config.runtime,
+            notifier=self.notifier,
             auto_send=self.config.reply_rules.auto_send_low_risk,
         )
