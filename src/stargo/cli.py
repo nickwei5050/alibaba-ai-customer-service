@@ -8,6 +8,8 @@ Commands:
     notify-test          send a test WeChat/WeCom message
     mail-check           poll the mailbox once and print parsed inquiries
     process <url>        run the full pipeline for one View Details URL
+    debug-url <url>      open a View Details URL, dump DOM/screenshots + extraction
+                         report, send nothing (for tuning Alibaba selectors)
     kb-search "<query>"  query the local knowledge index
     run                  long-running watch loop
 """
@@ -16,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+from pathlib import Path
 
 from .app import AppContext
 from .config import load_config
@@ -70,6 +73,54 @@ def cmd_process(app: AppContext, url: str) -> int:
     return 0
 
 
+def cmd_debug(app: AppContext, url: str) -> int:
+    """Playwright debug mode: open the URL, dump DOM + screenshots, attempt
+    extraction, print a report. Sends NOTHING."""
+    with app.browser() as browser:
+        report = browser.inspect(url)
+
+    def _status() -> str:
+        if report.get("error"):
+            return f"ERROR: {report['error']}"
+        if report.get("needs_login"):
+            return "NEEDS LOGIN — log in to Alibaba in the opened Chrome, then retry"
+        if report.get("needs_captcha"):
+            return "CAPTCHA / verification — handle manually, do not bypass"
+        if report.get("extraction_failed"):
+            return "EXTRACTION FAILED — selectors likely need tuning (see DOM dump)"
+        return "OK"
+
+    lines = [
+        "===== STARGO Alibaba Extraction Report =====",
+        f"url:            {report.get('url', '')}",
+        f"status:         {_status()}",
+        f"buyer_name:     {report.get('buyer_name') or '(not found)'}",
+        f"country:        {report.get('country') or '(not found)'}",
+        f"product_title:  {report.get('product_title') or '(not found)'}",
+        f"product_url:    {report.get('product_url') or '(not found)'}",
+        f"latest_message: {(report.get('latest_message') or '(not found)')[:300]}",
+        f"chat messages:  {report.get('chat_history_count', 0)}",
+        f"dom dump:       {report.get('dom_text_path', '')} ({report.get('dom_chars', 0)} chars)",
+        f"html dump:      {report.get('html_path', '')}",
+        f"screenshots:    {', '.join(s for s in report.get('screenshots', []) if s)}",
+    ]
+    preview = report.get("chat_preview") or []
+    if preview:
+        lines.append("chat preview:")
+        lines += [f"  - {m[:160]}" for m in preview]
+    report_text = "\n".join(lines)
+    print(report_text)
+
+    # Persist the report next to the dumps.
+    if report.get("dom_text_path"):
+        report_path = Path(report["dom_text_path"]).with_name(
+            Path(report["dom_text_path"]).stem.replace("-dom", "-report") + ".txt"
+        )
+        report_path.write_text(report_text, encoding="utf-8")
+        print(f"\nReport saved: {report_path}")
+    return 0
+
+
 def cmd_run(app: AppContext) -> int:
     app.watch_service().run_forever()
     return 0
@@ -86,6 +137,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_proc.add_argument("url")
     p_kb = sub.add_parser("kb-search", help="Search the knowledge base")
     p_kb.add_argument("query")
+    p_dbg = sub.add_parser("debug-url", help="Open an Alibaba View Details URL and dump an extraction report (sends nothing)")
+    p_dbg.add_argument("url")
     sub.add_parser("run", help="Run the long-running watch loop")
     return parser
 
@@ -104,6 +157,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_kb_search(app, args.query)
     if args.command == "process":
         return cmd_process(app, args.url)
+    if args.command == "debug-url":
+        return cmd_debug(app, args.url)
     if args.command == "run":
         return cmd_run(app)
     return 1

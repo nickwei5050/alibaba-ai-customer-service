@@ -96,6 +96,64 @@ class AlibabaBrowser:
             except Exception:
                 pass
 
+    def inspect(self, url: str) -> dict:
+        """Debug mode: open the URL, dump DOM text/HTML + screenshots, attempt
+        extraction, and return a report. **Never sends a reply.**"""
+        if self._context is None:
+            raise RuntimeError("Browser not started; call start() first.")
+        debug_dir = Path(self.runtime.screenshot_dir).parent / "debug"
+        debug_dir.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+
+        page = self._context.new_page()
+        page.set_default_timeout(self.cfg.nav_timeout_ms)
+        report: dict = {"url": url, "timestamp": ts, "screenshots": []}
+        try:
+            report["screenshots"].append(self._screenshot(page, "debug-before"))
+            page.goto(url, wait_until="domcontentloaded")
+            time.sleep(max(self.runtime.min_action_interval_seconds, 2))
+            report["screenshots"].append(self._screenshot(page, "debug-loaded"))
+
+            # Dump DOM text + raw HTML for offline selector tuning.
+            dom_text = ""
+            try:
+                dom_text = page.inner_text("body") or ""
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.warning("DOM text dump failed: %s", exc)
+            dom_path = debug_dir / f"{ts}-dom.txt"
+            dom_path.write_text(dom_text, encoding="utf-8")
+            report["dom_text_path"] = str(dom_path)
+            report["dom_chars"] = len(dom_text)
+            try:
+                html_path = debug_dir / f"{ts}-page.html"
+                html_path.write_text(page.content() or "", encoding="utf-8")
+                report["html_path"] = str(html_path)
+            except Exception:  # pragma: no cover
+                report["html_path"] = ""
+
+            ctx = extract_chat(page)
+            report["needs_login"] = ctx.needs_login
+            report["needs_captcha"] = ctx.needs_captcha
+            report["extraction_failed"] = ctx.extraction_failed
+            report["buyer_name"] = ctx.buyer_name
+            report["country"] = ctx.country
+            report["product_title"] = ctx.product_title
+            report["product_url"] = ctx.product_url
+            report["latest_message"] = ctx.latest_message
+            report["chat_history_count"] = len(ctx.chat_history)
+            report["chat_preview"] = ctx.chat_history[:5]
+            return report
+        except Exception as exc:
+            logger.error("inspect failed for %s: %s", url, exc)
+            report["error"] = str(exc)
+            report["screenshots"].append(self._screenshot(page, "debug-error"))
+            return report
+        finally:
+            try:
+                page.close()
+            except Exception:
+                pass
+
     def open_and_reply(self, url: str, reply_text: str) -> tuple[ChatContext, bool]:
         """Open the inquiry, then type+send ``reply_text``. Returns (ctx, sent)."""
         if self._context is None:

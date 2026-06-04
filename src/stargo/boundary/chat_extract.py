@@ -31,6 +31,19 @@ _PRODUCT_TITLE_SELECTORS = (
     "[class*='card-title']",
     "a[href*='/product-detail']",
 )
+_BUYER_NAME_SELECTORS = (
+    "[class*='contact-name']",
+    "[class*='buyer-name']",
+    "[class*='user-name']",
+    "[class*='customer-name']",
+    "[class*='nickname']",
+)
+_COUNTRY_SELECTORS = (
+    "[class*='country']",
+    "[class*='nation']",
+    "[class*='region']",
+    "img[class*='flag'][alt]",
+)
 
 
 def _page_text(page: Any) -> str:
@@ -92,8 +105,12 @@ def extract_chat(page: Any) -> ChatContext:
 
     messages = _all_messages(page)
     product_title = _first_text(page, _PRODUCT_TITLE_SELECTORS)
+    buyer_name = _first_text(page, _BUYER_NAME_SELECTORS)
+    country = _first_text(page, _COUNTRY_SELECTORS)
 
     ctx = ChatContext(
+        buyer_name=buyer_name,
+        country=country,
         product_title=product_title,
         product_url=url,
         latest_message=messages[-1] if messages else "",

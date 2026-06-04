@@ -7,6 +7,7 @@ service_account.json
 # Runtime data
 data/screenshots/
 data/logs/
+data/debug/
 data/*.db
 data/*.sqlite
 chrome-profile/
