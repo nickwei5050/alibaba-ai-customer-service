@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 
-from ..models import InquiryRecord
+from ..entity.models import InquiryRecord
 
 logger = logging.getLogger(__name__)
 

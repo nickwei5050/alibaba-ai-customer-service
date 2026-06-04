@@ -12,8 +12,8 @@ import re
 from collections import Counter
 
 from ..config import KnowledgeConfig
-from .obsidian_loader import KnowledgeDoc, load_obsidian
-from .notion_loader import load_notion
+from .knowledge_obsidian import KnowledgeDoc, load_obsidian
+from .knowledge_notion import load_notion
 
 logger = logging.getLogger(__name__)
 

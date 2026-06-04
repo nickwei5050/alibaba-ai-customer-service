@@ -1,5 +1,5 @@
-from src.stargo.knowledge.obsidian_loader import KnowledgeDoc
-from src.stargo.knowledge.retriever import Retriever
+from src.stargo.boundary.knowledge_obsidian import KnowledgeDoc
+from src.stargo.boundary.knowledge_retriever import Retriever
 
 
 def _docs():

@@ -1,4 +1,4 @@
-from src.stargo.inbox.parse_alibaba_email import parse_inquiry
+from src.stargo.boundary.mail_parser import parse_inquiry
 
 SAMPLE_HTML = """
 <html><body>

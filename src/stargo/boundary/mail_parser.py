@@ -15,7 +15,7 @@ from typing import Optional
 
 from bs4 import BeautifulSoup
 
-from ..models import EmailInquiry
+from ..entity.models import EmailInquiry
 
 # Anchor text that typically wraps the link into the Trade Center conversation.
 _VIEW_DETAILS_TEXTS = (

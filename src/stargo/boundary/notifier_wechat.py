@@ -5,10 +5,8 @@ from __future__ import annotations
 import logging
 
 from ..config import WeChatConfig
-from ..models import AIReply, ChatContext
-from .pushplus import send_pushplus
-from .serverchan import send_serverchan
-from .wecom import send_wecom_message
+from ..entity.models import AIReply, ChatContext
+from .notify_providers import send_pushplus, send_serverchan, send_wecom_message
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +48,9 @@ def format_alert(title: str, detail: str, *, url: str = "") -> tuple[str, str]:
     return title, body
 
 
-class Notifier:
+class WeChatNotifier:
+    """Concrete :class:`~stargo.boundary.interfaces.Notifier` implementation."""
+
     def __init__(self, config: WeChatConfig) -> None:
         self.config = config
 

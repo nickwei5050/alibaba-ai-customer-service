@@ -1,6 +1,6 @@
-from src.stargo.ai.reply_generator import ReplyGenerator
+from src.stargo.boundary.drafter_ai import ReplyGenerator
 from src.stargo.config import AIConfig
-from src.stargo.models import ChatContext
+from src.stargo.entity.models import ChatContext
 
 
 def test_offline_reply_is_safe_and_collects_info():

@@ -10,8 +10,8 @@ without a human.
 from __future__ import annotations
 
 from ..config import ReplyRules
-from ..models import AIReply, ChatContext
-from ..knowledge.rules import (
+from ..entity.models import AIReply, ChatContext
+from ..entity.rules import (
     contains_forbidden_promise,
     detect_risk_topics,
 )

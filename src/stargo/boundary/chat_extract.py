@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from ..models import ChatContext
+from ..entity.models import ChatContext
 
 logger = logging.getLogger(__name__)
 

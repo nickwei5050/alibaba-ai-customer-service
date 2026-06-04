@@ -1,7 +1,7 @@
 """STARGO hard rules and risk-topic detection.
 
 These rules are the safety backbone. The AI is *told* the rules in the system
-prompt, but the :class:`~stargo.ai.risk_checker.RiskChecker` also enforces them
+prompt, but the :class:`~stargo.control.risk_controller.RiskChecker` also enforces them
 deterministically here, so a careless model output can never auto-send a quote.
 """
 

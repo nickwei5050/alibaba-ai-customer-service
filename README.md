@@ -48,10 +48,10 @@ cp .env.example .env                     # fill in secrets
 cp config/config.example.yaml config/config.yaml
 
 # Step 1 — verify WeChat notifications work first (recommended)
-python -m src.stargo.main notify-test
+python -m src.stargo.cli notify-test
 
 # Run the full watch loop (email -> browser -> AI -> notify)
-python -m src.stargo.main run
+python -m src.stargo.cli run
 ```
 
 See the build roadmap below — **do not enable auto-send until you have reviewed
@@ -85,20 +85,49 @@ See the build roadmap below — **do not enable auto-send until you have reviewe
 - All quotes split **bare vehicle price + battery price = total EXW price**.
 - All secrets live in `.env`; every action is logged.
 
-## Project layout
+## Architecture — ECC (Entity · Control · Boundary)
+
+The system is organised as three layers with **dependency inversion**: Control
+depends only on Boundary *Protocols* (`boundary/interfaces.py`), never on
+concrete adapters. The composition root (`app.py`) is the one place that wires
+concrete implementations in. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ```
 src/stargo/
-  config.py            load + validate config.yaml and .env
-  models.py            pydantic data models
-  main.py              CLI / orchestrator
-  inbox/               IMAP watcher + Alibaba email parser + dedupe store
-  browser/             Playwright driver, chat extraction, send reply
-  knowledge/           Obsidian + Notion loaders, retriever, hard rules
-  ai/                  reply generator + risk controller
-  notify/              WeCom / ServerChan / PushPlus + dispatcher
-  crm/                 SQLite logger + Google Sheet sync
-config/                config.example.yaml + prompts
-data/                  screenshots, logs, sqlite db (gitignored)
-tests/                 unit tests for the pure logic
+  config.py               load + validate config.yaml and .env (cross-cutting)
+  logging_setup.py        console + rotating file logging (cross-cutting)
+  app.py                  composition root: wire Boundary adapters into Control
+  cli.py                  argparse entrypoint (delegates to app)
+
+  entity/                 E — pure domain, no IO
+    models.py             pydantic data models
+    rules.py              hard rules + risk-topic detection (pure functions)
+
+  boundary/               B — adapters to the outside world + their interfaces
+    interfaces.py         Protocols: MailSource, BrowserDriver, KnowledgeBase,
+                          ReplyDrafter, Notifier, CRMSink, DedupeStore
+    mail_imap.py          IMAP watcher (Gmail/QQ)        -> MailSource
+    mail_parser.py        Alibaba email -> EmailInquiry
+    dedupe_sqlite.py      processed-email store          -> DedupeStore
+    browser_playwright.py persistent-Chrome driver       -> BrowserDriver
+    chat_extract.py       DOM-first chat extraction
+    chat_send.py          type + send reply
+    knowledge_obsidian.py Obsidian vault loader
+    knowledge_notion.py   optional Notion sync
+    knowledge_retriever.py keyword retriever             -> KnowledgeBase
+    drafter_ai.py         OpenAI + offline drafter       -> ReplyDrafter
+    notify_providers.py   WeCom / ServerChan / PushPlus (low-level)
+    notifier_wechat.py    dispatcher + formatting        -> Notifier
+    crm_sqlite.py         SQLite logger                  -> CRMSink
+    crm_google_sheet.py   optional Google Sheet sink
+
+  control/                C — orchestration, depends only on Entity + interfaces
+    risk_controller.py    deterministic auto-send gate (final say)
+    inquiry_pipeline.py   one inquiry, end to end
+    watch_service.py      long-running poll loop
+
+config/                   config.example.yaml + prompts
+knowledge/                sample knowledge vault (replace with real content)
+data/                     screenshots, logs, sqlite db (gitignored)
+tests/                    unit tests incl. a fakes-only pipeline test
 ```

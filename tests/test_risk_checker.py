@@ -1,6 +1,6 @@
-from src.stargo.ai.risk_checker import RiskChecker
 from src.stargo.config import ReplyRules
-from src.stargo.models import AIReply, ChatContext
+from src.stargo.control.risk_controller import RiskChecker
+from src.stargo.entity.models import AIReply, ChatContext
 
 
 def _reply(text="Hi, could you confirm the model and quantity?"):

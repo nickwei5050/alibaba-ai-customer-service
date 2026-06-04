@@ -21,9 +21,9 @@ from pathlib import Path
 from typing import Any, Iterator
 
 from ..config import BrowserConfig, RuntimeConfig
-from ..models import ChatContext
-from .extract_chat import extract_chat
-from .send_reply import send_reply as _send_reply
+from ..entity.models import ChatContext
+from .chat_extract import extract_chat
+from .chat_send import send_reply as _send_reply
 
 logger = logging.getLogger(__name__)
 

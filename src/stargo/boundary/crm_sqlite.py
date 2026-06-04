@@ -5,7 +5,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-from ..models import InquiryRecord
+from ..entity.models import InquiryRecord
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS inquiries (

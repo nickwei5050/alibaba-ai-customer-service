@@ -13,8 +13,8 @@ import logging
 from pathlib import Path
 
 from ..config import AIConfig
-from ..models import AIReply, ChatContext
-from ..knowledge.rules import QUOTE_STRUCTURE, detect_risk_topics
+from ..entity.models import AIReply, ChatContext
+from ..entity.rules import QUOTE_STRUCTURE, detect_risk_topics
 
 logger = logging.getLogger(__name__)
 

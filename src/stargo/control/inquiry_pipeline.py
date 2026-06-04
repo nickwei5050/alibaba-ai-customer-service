@@ -1,58 +1,52 @@
-"""End-to-end orchestration of a single inquiry.
+"""Control: end-to-end orchestration of a single inquiry.
 
-Wires together: browser extraction -> knowledge retrieval -> AI draft ->
-deterministic risk control -> optional auto-send -> WeChat notify -> CRM log.
+Depends only on the Entity models and the Boundary *Protocols* — never on
+concrete adapters. Concrete implementations are injected by :mod:`stargo.app`,
+which keeps this business logic unit-testable with fakes.
+
+Flow: browser extraction -> knowledge retrieval -> AI draft -> deterministic
+risk control -> optional auto-send -> WeChat notify -> CRM log.
 """
 
 from __future__ import annotations
 
 import logging
 
-from .ai.reply_generator import ReplyGenerator
-from .ai.risk_checker import RiskChecker
-from .browser.alibaba_playwright import AlibabaBrowser
-from .config import Config
-from .crm.sqlite_logger import SqliteLogger
-from .knowledge.retriever import Retriever
-from .models import AIReply, ChatContext, InquiryRecord
-from .notify.notifier import Notifier
+from ..boundary.interfaces import (
+    BrowserDriver,
+    CRMSink,
+    KnowledgeBase,
+    Notifier,
+    ReplyDrafter,
+)
+from ..entity.models import AIReply, ChatContext, InquiryRecord
+from .risk_controller import RiskChecker
 
 logger = logging.getLogger(__name__)
 
 
-class Pipeline:
+class InquiryPipeline:
     def __init__(
         self,
-        config: Config,
         *,
-        retriever: Retriever,
-        generator: ReplyGenerator,
+        knowledge: KnowledgeBase,
+        drafter: ReplyDrafter,
         risk_checker: RiskChecker,
         notifier: Notifier,
-        crm: SqliteLogger,
+        crm: CRMSink,
+        max_context_chars: int = 6000,
     ) -> None:
-        self.config = config
-        self.retriever = retriever
-        self.generator = generator
+        self.knowledge = knowledge
+        self.drafter = drafter
         self.risk_checker = risk_checker
         self.notifier = notifier
         self.crm = crm
-
-    @classmethod
-    def build(cls, config: Config) -> "Pipeline":
-        return cls(
-            config,
-            retriever=Retriever.from_config(config.knowledge),
-            generator=ReplyGenerator(config.ai),
-            risk_checker=RiskChecker(config.reply_rules),
-            notifier=Notifier(config.wechat),
-            crm=SqliteLogger(config.crm.sqlite_path),
-        )
+        self.max_context_chars = max_context_chars
 
     def _draft(self, ctx: ChatContext) -> AIReply:
         query = " ".join(filter(None, [ctx.product_title, ctx.latest_message]))
-        knowledge = self.retriever.context_snippets(query, self.config.ai.max_context_chars)
-        reply = self.generator.generate(ctx, knowledge)
+        knowledge = self.knowledge.context_snippets(query, self.max_context_chars)
+        reply = self.drafter.generate(ctx, knowledge)
         # Policy has the final say over routing.
         return self.risk_checker.apply(ctx, reply)
 
@@ -76,8 +70,8 @@ class Pipeline:
         except Exception as exc:  # pragma: no cover - defensive
             logger.error("CRM logging failed: %s", exc)
 
-    def process(self, browser: AlibabaBrowser, url: str) -> ChatContext:
-        """Process one inquiry using an already-started browser."""
+    def process(self, browser: BrowserDriver, url: str) -> ChatContext:
+        """Process one inquiry using an already-started browser driver."""
         logger.info("Processing inquiry: %s", url)
         ctx = browser.open_inquiry(url)
 

@@ -1,5 +1,5 @@
-from src.stargo.models import AIReply, ChatContext
-from src.stargo.notify.notifier import format_inquiry_message
+from src.stargo.boundary.notifier_wechat import format_inquiry_message
+from src.stargo.entity.models import AIReply, ChatContext
 
 
 def test_high_risk_title_and_body():

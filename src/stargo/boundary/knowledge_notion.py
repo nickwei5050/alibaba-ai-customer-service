@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from .obsidian_loader import KnowledgeDoc
+from .knowledge_obsidian import KnowledgeDoc
 
 logger = logging.getLogger(__name__)
 

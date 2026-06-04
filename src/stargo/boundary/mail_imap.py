@@ -15,9 +15,9 @@ from email.header import decode_header, make_header
 from typing import Iterable
 
 from ..config import EmailConfig
-from ..models import EmailInquiry
-from .parse_alibaba_email import parse_email_message
-from .store import ProcessedStore
+from ..entity.models import EmailInquiry
+from .mail_parser import parse_email_message
+from .dedupe_sqlite import ProcessedStore
 
 logger = logging.getLogger(__name__)
 
