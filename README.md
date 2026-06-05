@@ -56,7 +56,35 @@ python -m src.stargo.cli run
 
 See the build roadmap below — **do not enable auto-send until you have reviewed
 50–100 real inquiries by hand.** `reply_rules.auto_send_low_risk` defaults to
-`false`.
+`false`, and `safety.force_manual_only` defaults to `true` (a master switch that
+blocks *all* sending regardless of AI output).
+
+### Windows 本地部署（一键）
+
+```powershell
+# 1) 克隆到本地文件夹（例：E:\阿里AI客服智能体）
+cd E:\
+git clone https://github.com/nickwei5050/alibaba-ai-customer-service.git "阿里AI客服智能体"
+cd "E:\阿里AI客服智能体"
+git checkout claude/stargo-alibaba-ai-assistant-yvXH5
+
+# 2) 一键安装（建虚拟环境 + 装依赖 + 下载浏览器 + 生成 config.yaml/.env）
+powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
+
+# 3) 编辑 .env 填密钥，然后激活环境并验证
+notepad .env
+.\.venv\Scripts\Activate.ps1
+python -m src.stargo.cli notify-test
+python -m src.stargo.cli kb-sync
+python -m src.stargo.cli mail-check
+python -m src.stargo.cli debug-url "真实 Alibaba View Details URL"
+python -m src.stargo.cli run-once --dry-run
+```
+
+提示：
+- `mail-check` 若找不到邮件，把 `config.yaml` 里 `email.subject_keyword` 改成你邮件标题真实出现的词，或留空 `""` 匹配全部。
+- `debug-url` 第一次若跳登录页，在弹出的 Chrome 里手动登录阿里一次，再重跑（持久化 profile 会记住）。
+- 没装 Chrome 浏览器内核时按提示运行 `python -m playwright install chromium`。
 
 ## CLI
 
@@ -64,8 +92,11 @@ See the build roadmap below — **do not enable auto-send until you have reviewe
 | --- | --- |
 | `notify-test` | Send a test WeChat/WeCom message. |
 | `mail-check` | Poll the mailbox once and print parsed inquiries. |
-| `process URL` | Run the browser + AI + notify pipeline for a single View Details URL. |
+| `kb-sync` | Pull the Notion product catalog (all models' specs) into the local index. |
 | `kb-search "..."` | Query the local knowledge index. |
+| `debug-url URL` | Open a View Details URL, dump DOM/HTML/screenshot + extraction report. **Sends nothing.** |
+| `process URL` | Run the browser + AI + notify pipeline for a single View Details URL. |
+| `run-once [--dry-run]` | One full poll cycle (email→page→KB→reply→WeChat→CRM). `--dry-run` never sends. |
 | `run` | Long-running watch loop. |
 
 ## Build roadmap (recommended order)

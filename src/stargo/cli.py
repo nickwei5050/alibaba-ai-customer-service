@@ -217,6 +217,16 @@ def main(argv: list[str] | None = None) -> int:
     setup_logging(config.runtime.log_dir)
     app = AppContext(config)
 
+    try:
+        return _dispatch(app, args)
+    except RuntimeError as exc:
+        # Friendly, actionable message for setup problems (e.g. browser missing)
+        # instead of a raw traceback.
+        print(f"\n[STARGO] {exc}")
+        return 1
+
+
+def _dispatch(app: AppContext, args) -> int:
     if args.command == "notify-test":
         return cmd_notify_test(app)
     if args.command == "mail-check":

@@ -44,7 +44,12 @@ class AlibabaBrowser:
 
     # -- lifecycle ---------------------------------------------------------
     def start(self) -> None:
-        from playwright.sync_api import sync_playwright  # lazy import
+        try:
+            from playwright.sync_api import sync_playwright  # lazy import
+        except ImportError as exc:
+            raise RuntimeError(
+                "Playwright 未安装。请先运行：pip install -r requirements.txt"
+            ) from exc
 
         self._pw = sync_playwright().start()
         launch_kwargs: dict[str, Any] = {
@@ -54,7 +59,20 @@ class AlibabaBrowser:
         }
         if self.cfg.channel:
             launch_kwargs["channel"] = self.cfg.channel
-        self._context = self._pw.chromium.launch_persistent_context(**launch_kwargs)
+        try:
+            self._context = self._pw.chromium.launch_persistent_context(**launch_kwargs)
+        except Exception as exc:
+            msg = str(exc)
+            if "Executable doesn't exist" in msg or "playwright install" in msg:
+                raise RuntimeError(
+                    "Chromium 浏览器未安装。请运行：python -m playwright install chromium"
+                ) from exc
+            if self.cfg.channel and ("channel" in msg.lower() or "not found" in msg.lower()):
+                raise RuntimeError(
+                    f"找不到 Chrome 通道 '{self.cfg.channel}'。请安装 Google Chrome，"
+                    "或在 config.yaml 把 browser.channel 设为空字符串以使用内置 Chromium。"
+                ) from exc
+            raise
         logger.info("Launched persistent Chrome context (%s).", self.cfg.chrome_user_data_dir)
 
     def stop(self) -> None:
