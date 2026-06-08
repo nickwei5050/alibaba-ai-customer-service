@@ -1,0 +1,20 @@
+# Core
+pydantic>=2.6
+PyYAML>=6.0
+python-dotenv>=1.0
+requests>=2.31
+
+# Email parsing
+beautifulsoup4>=4.12
+
+# Browser automation (install browsers with: python -m playwright install chromium)
+playwright>=1.42
+
+# Optional integrations (imported lazily; safe to omit if unused)
+openai>=1.30           # AI reply generation
+notion-client>=2.2     # Notion knowledge base sync
+gspread>=6.0           # Google Sheet CRM sync
+google-auth>=2.29      # Google Sheet auth
+
+# Dev / tests
+pytest>=8.0

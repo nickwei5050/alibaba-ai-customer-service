@@ -1,0 +1,91 @@
+# STARGO Alibaba Inquiry AI Assistant — configuration
+# Copy to config/config.yaml and adjust. Secrets stay in .env (referenced as ${VAR}).
+
+email:
+  provider: gmail              # gmail | qq
+  imap_host: imap.gmail.com    # qq: imap.qq.com
+  imap_port: 993
+  folder: INBOX
+  subject_keyword: "Alibaba Inquiry Notification"
+  user: "${EMAIL_USER}"
+  password: "${EMAIL_PASSWORD}"
+  # Only look at mail newer than this many days on each poll.
+  lookback_days: 3
+
+browser:
+  # Persistent Chrome profile so Alibaba stays logged in. Never store the password.
+  chrome_user_data_dir: "./chrome-profile"   # Windows e.g. C:/Users/<you>/stargo-chrome-profile
+  chrome_profile: "Default"
+  channel: "chrome"            # use installed Chrome; "" for bundled Chromium
+  headless: false              # MUST be visible so you can log in / solve captcha once
+  nav_timeout_ms: 45000
+  slow_mo_ms: 250              # gentle pacing to look human and avoid rate limits
+
+# Alibaba Trade Center DOM selectors.
+# The built-in defaults (see SelectorConfig in src/stargo/config.py) are the
+# single source of truth — leave this block out entirely to use them.
+# Only add a `selectors:` block to OVERRIDE a field after `debug-url "<url>"`
+# shows the default didn't match on the real page. When you override a field,
+# list every selector you want tried (your list replaces the default for that
+# field). Fields: buyer_name / country / product_title / message / input_box /
+# send_button. Example (uncomment and edit just the field you need):
+#
+# selectors:
+#   buyer_name:
+#     - "[data-spm='buyerName']"        # selector you confirmed via debug-url
+#     - "[class*='contact-name']"       # keep the defaults you still want
+
+knowledge:
+  obsidian_path: "./knowledge"            # local Markdown vault (see categories below)
+  notion_enabled: false                   # set true + NOTION_API_KEY to pull live Notion content
+  notion_api_key: "${NOTION_API_KEY}"
+  notion_database_id: "${NOTION_DATABASE_ID}"
+  # STARGO Product Catalog database (all models' structured specs). Run `kb-sync`
+  # locally to pull all rows into the index. The id below is the catalog DB id.
+  notion_catalog_database_id: "3993f47a191f4ea3914046917a5dc28b"
+  # Knowledge categories (folders under obsidian_path):
+  # company / products / prices / battery / shipping / sample / distributor / faq / rules / scripts
+
+ai:
+  provider: openai             # openai | offline (rule-based fallback)
+  api_key: "${OPENAI_API_KEY}"
+  base_url: "${OPENAI_BASE_URL}"
+  model: "${OPENAI_MODEL}"
+  temperature: 0.3
+  max_context_chars: 6000      # knowledge snippets budget injected into the prompt
+
+reply_rules:
+  # Keep auto-send OFF until you have manually reviewed 50-100 inquiries.
+  auto_send_low_risk: false
+  require_approval_for_price: true
+  require_approval_for_shipping: true
+  require_approval_for_distributor: true
+  require_approval_for_payment_terms: true
+  require_approval_for_delivery_time: true
+
+safety:
+  # Master kill-switch for the current rollout phase. While true, NOTHING is
+  # ever auto-sent to a buyer — every reply is routed to human approval,
+  # regardless of AI output or low-risk rules. Keep true until trusted.
+  force_manual_only: true
+
+wechat:
+  provider: serverchan         # serverchan | pushplus | wecom
+  wecom_webhook_url: "${WECOM_WEBHOOK_URL}"
+  serverchan_sendkey: "${SERVERCHAN_SENDKEY}"
+  pushplus_token: "${PUSHPLUS_TOKEN}"
+
+crm:
+  provider: sqlite             # sqlite | google_sheet
+  sqlite_path: "./data/stargo.db"
+  google_sheet_id: "${GOOGLE_SHEET_ID}"
+  google_service_account_json: "${GOOGLE_SERVICE_ACCOUNT_JSON}"
+
+runtime:
+  check_interval_seconds: 60
+  screenshot_dir: "./data/screenshots"
+  log_dir: "./data/logs"
+  db_path: "./data/stargo.db"
+  # Politeness: max inquiries processed per poll, and min seconds between browser actions.
+  max_per_cycle: 5
+  min_action_interval_seconds: 2
