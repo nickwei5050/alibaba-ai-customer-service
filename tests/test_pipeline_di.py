@@ -107,7 +107,7 @@ def test_high_risk_routes_to_approval():
     pipe.process(browser, "https://x/inq")
 
     assert browser.sent_text is None              # never auto-sent a quote
-    assert crm.records[-1].status == "awaiting_approval"
+    assert crm.records[-1].status == "waiting_approval"
     assert notifier.inquiries[0][1].human_approval_required is True
 
 

@@ -15,6 +15,7 @@ _HEADER = [
     "date", "platform", "buyer_name", "country", "product_title", "product_url",
     "buyer_message", "ai_intent", "customer_level", "ai_reply_en", "auto_send",
     "approval_required", "status", "screenshot_path", "next_follow_up_time",
+    "email_message_id", "chat_history", "debug_report_path",
 ]
 
 
@@ -58,6 +59,9 @@ class GoogleSheetLogger:
                     record.status,
                     record.screenshot_path,
                     record.next_follow_up_time.isoformat() if record.next_follow_up_time else "",
+                    record.email_message_id,
+                    record.chat_history,
+                    record.debug_report_path,
                 ]
             )
         except Exception as exc:  # pragma: no cover - network/auth errors

@@ -41,7 +41,8 @@ def format_inquiry_message(ctx: ChatContext, reply: AIReply, *, url: str = "") -
         f"**中文解释**：{reply.reply_cn or '(无)'}\n\n"
         f"**是否需要人工确认**：{approval}\n"
         f"**处理建议**：{action}\n"
-        f"**调试截图**：{ctx.screenshot_path or '(无)'}"
+        f"**调试截图**：{ctx.screenshot_path or '(无)'}\n"
+        f"**提取报告**：{ctx.debug_report_path or '(无)'}"
     )
     if url:
         body += f"\n\n[打开阿里对话]({url})"

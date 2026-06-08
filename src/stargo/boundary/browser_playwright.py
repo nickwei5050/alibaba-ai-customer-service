@@ -96,6 +96,20 @@ class AlibabaBrowser:
             logger.warning("Screenshot failed (%s): %s", tag, exc)
             return ""
 
+    def _dump_dom(self, page: Any, tag: str = "inquiry-dom") -> str:
+        """Save the page's DOM text under data/debug for traceability / selector
+        tuning. Returns the path (empty string on failure)."""
+        debug_dir = Path(self.runtime.screenshot_dir).parent / "debug"
+        debug_dir.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+        path = debug_dir / f"{ts}-{tag}.txt"
+        try:
+            path.write_text(page.inner_text("body") or "", encoding="utf-8")
+            return str(path)
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("DOM dump failed (%s): %s", tag, exc)
+            return ""
+
     # -- main operations ---------------------------------------------------
     def open_inquiry(self, url: str) -> ChatContext:
         """Open a View Details URL and extract the chat context."""
@@ -109,6 +123,7 @@ class AlibabaBrowser:
             time.sleep(max(self.runtime.min_action_interval_seconds, 2))
             ctx = extract_chat(page, self.selectors)
             ctx.screenshot_path = self._screenshot(page, "loaded")
+            ctx.debug_report_path = self._dump_dom(page, "inquiry-dom")
             return ctx
         except Exception as exc:
             logger.error("Failed to open inquiry %s: %s", url, exc)

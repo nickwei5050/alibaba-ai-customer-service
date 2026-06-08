@@ -76,6 +76,9 @@ class InquiryPipeline:
             approval_required=reply.human_approval_required,
             status=status,
             screenshot_path=ctx.screenshot_path,
+            email_message_id=ctx.email_message_id,
+            chat_history="\n".join(ctx.chat_history),
+            debug_report_path=ctx.debug_report_path,
         )
         try:
             self.crm.log(record)
@@ -135,7 +138,7 @@ class InquiryPipeline:
 
         reply = self._draft(ctx)
 
-        status = "dry_run" if dry_run else "awaiting_approval"
+        status = "dry_run" if dry_run else "waiting_approval"
         if self._may_send(reply, dry_run):
             _, sent = browser.open_and_reply(url, reply.reply_en)
             status = "auto_sent" if sent else "failed"

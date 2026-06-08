@@ -44,9 +44,12 @@ class ChatContext(BaseModel):
     needs_captcha: bool = False
     extraction_failed: bool = False
     screenshot_path: str = ""
+    # Path to the DOM/extraction debug dump saved for this read (traceability).
+    debug_report_path: str = ""
     # Optional carry-throughs for the notification / CRM (from the source email).
     received_at: Optional[datetime] = None
     message_preview: str = ""
+    email_message_id: str = ""
 
     def merge_email_hint(self, email: "EmailInquiry") -> None:
         """Fill any field the DOM extraction missed from the source email."""
@@ -56,6 +59,7 @@ class ChatContext(BaseModel):
         self.latest_message = self.latest_message or email.message_preview
         self.message_preview = self.message_preview or email.message_preview
         self.received_at = self.received_at or email.received_at
+        self.email_message_id = self.email_message_id or email.message_id
 
     @property
     def ok(self) -> bool:
@@ -92,6 +96,10 @@ class InquiryRecord(BaseModel):
     ai_reply_cn: str = ""
     auto_send: bool = False
     approval_required: bool = True
-    status: str = "new"          # new | auto_sent | awaiting_approval | failed | needs_login | dry_run | parse_failed
+    status: str = "new"          # new | auto_sent | waiting_approval | failed | needs_login | needs_captcha | dry_run
     screenshot_path: str = ""
     next_follow_up_time: Optional[datetime] = None
+    # Traceability: source Alibaba notification email + the read's debug artifacts.
+    email_message_id: str = ""
+    chat_history: str = ""       # newline-joined buyer/seller turns read off the page
+    debug_report_path: str = ""

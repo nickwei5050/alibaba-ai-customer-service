@@ -26,7 +26,10 @@ CREATE TABLE IF NOT EXISTS inquiries (
     approval_required INTEGER,
     status TEXT,
     screenshot_path TEXT,
-    next_follow_up_time TEXT
+    next_follow_up_time TEXT,
+    email_message_id TEXT,
+    chat_history TEXT,
+    debug_report_path TEXT
 )
 """
 
@@ -34,6 +37,9 @@ CREATE TABLE IF NOT EXISTS inquiries (
 _MIGRATIONS = (
     ("missing_info", "TEXT"),
     ("ai_reply_cn", "TEXT"),
+    ("email_message_id", "TEXT"),
+    ("chat_history", "TEXT"),
+    ("debug_report_path", "TEXT"),
 )
 
 
@@ -58,8 +64,8 @@ class SqliteLogger:
                 date, platform, buyer_name, country, product_title, product_url,
                 buyer_message, ai_intent, customer_level, missing_info, ai_reply_en,
                 ai_reply_cn, auto_send, approval_required, status, screenshot_path,
-                next_follow_up_time
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                next_follow_up_time, email_message_id, chat_history, debug_report_path
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 record.date.isoformat(),
@@ -79,6 +85,9 @@ class SqliteLogger:
                 record.status,
                 record.screenshot_path,
                 record.next_follow_up_time.isoformat() if record.next_follow_up_time else None,
+                record.email_message_id,
+                record.chat_history,
+                record.debug_report_path,
             ),
         )
         self._conn.commit()
