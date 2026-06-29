@@ -4,10 +4,13 @@ Search the `stargo` repo for each inconsistent string and replace with the
 canonical value from `lib/companyFacts.ts`.
 
 ## 1. Model count — replace ALL of these
-Search: `60+`, `80+ models`, `83 export models`, `83 models`, `60 models`
+Search: `60+`, `80+ models`, `83 export models`, `83 models`, `63 款`, `60 models`
 
-Canonical (`modelRange.statement`):
-> 80+ export-ready electric two-wheel and three-wheel models, including 83 listed configurations.
+Canonical (`modelRange.statement`) — synced from the Notion Product Catalog 2026-06-29:
+> 80+ export-ready electric two-wheel and three-wheel models, including 84 listed configurations.
+
+The full model list lives in `lib/products.ts` (synced from Notion). Render the
+product grid from there; pull full specs per model from Notion.
 
 Short form (`modelRange.short`): `80+ export-ready models`
 

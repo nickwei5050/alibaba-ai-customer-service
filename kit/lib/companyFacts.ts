@@ -67,11 +67,12 @@ export const commercialTerms = {
 /**
  * THE canonical model-range statement. Use `modelRange.statement` in copy.
  * Replaces all of: "60+ models", "80+ models", "83 export models".
+ * Count synced from the Notion Product Catalog (2026-06-29): 84 listed models.
  */
 export const modelRange = {
-  listedConfigurations: 83,
+  listedConfigurations: 84,
   statement:
-    "80+ export-ready electric two-wheel and three-wheel models, including 83 listed configurations.",
+    "80+ export-ready electric two-wheel and three-wheel models, including 84 listed configurations.",
   short: "80+ export-ready models",
 } as const;
 
